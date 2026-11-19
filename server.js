@@ -17,15 +17,15 @@ app.get("/health", (req, res) => {
   });
 });
 
-// AI MIND - OpenAI Chat
+// AI MIND - Gemini Chat
 app.post("/chat", async (req, res) => {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       return res.status(500).json({
         status: "error",
-        message: "OpenAI API Key is missing"
+        message: "Gemini API Key is missing"
       });
     }
 
@@ -39,17 +39,25 @@ app.post("/chat", async (req, res) => {
     }
 
     const response = await fetch(
-      "https://api.openai.com/v1/responses",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
+          "x-goog-api-key": apiKey
         },
         body: JSON.stringify({
-          model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-          instructions: "You are AI MIND, a helpful, friendly and intelligent AI assistant. Answer clearly and accurately.",
-          input: message.trim()
+          systemInstruction: {
+            parts: [{
+              text: "You are AI MIND, a helpful, friendly and intelligent AI assistant. Answer clearly and accurately."
+            }]
+          },
+          contents: [{
+            role: "user",
+            parts: [{
+              text: message.trim()
+            }]
+          }]
         })
       }
     );
@@ -57,19 +65,24 @@ app.post("/chat", async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("OpenAI API Error:", data);
+      console.error("Gemini API Error:", data);
+
       return res.status(502).json({
         status: "error",
         message: "AI service request failed"
       });
     }
 
-    const answer = (data.output || [])
-      .filter(item => item.type === "message")
-      .flatMap(item => item.content || [])
-      .filter(item => item.type === "output_text")
-      .map(item => item.text)
+    const answer = (data.candidates?.[0]?.content?.parts || [])
+      .map(part => part.text || "")
       .join("\n");
+
+    if (!answer) {
+      return res.status(502).json({
+        status: "error",
+        message: "AI response not found"
+      });
+    }
 
     res.json({
       status: "success",
