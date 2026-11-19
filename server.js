@@ -17,7 +17,7 @@ app.get("/health", (req, res) => {
   });
 });
 
-// AI MIND - Gemini Chat
+// AI MIND - Gemini AI Chat
 app.post("/chat", async (req, res) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -38,8 +38,10 @@ app.post("/chat", async (req, res) => {
       });
     }
 
+    const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
         headers: {
@@ -57,7 +59,11 @@ app.post("/chat", async (req, res) => {
             parts: [{
               text: message.trim()
             }]
-          }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
         })
       }
     );
@@ -69,13 +75,14 @@ app.post("/chat", async (req, res) => {
 
       return res.status(502).json({
         status: "error",
-        message: "AI service request failed"
+        message: "Gemini AI request failed"
       });
     }
 
     const answer = (data.candidates?.[0]?.content?.parts || [])
       .map(part => part.text || "")
-      .join("\n");
+      .join("\n")
+      .trim();
 
     if (!answer) {
       return res.status(502).json({
